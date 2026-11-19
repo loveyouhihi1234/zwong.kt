@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "TaxCap Suite — Tải HĐĐT, Hồ sơ thuế & Captcha",
   "short_name": "TaxCap Suite",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Bộ công cụ kế toán hợp nhất trên Side Panel: Tải hóa đơn điện tử hàng loạt (Excel/XML/HTML/PDF), Tải hồ sơ khai thuế DVC & Thuế ĐT và Tự điền Captcha cho 4 cổng Thuế.",
   "permissions": [
     "storage",

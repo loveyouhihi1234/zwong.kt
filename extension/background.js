@@ -754,16 +754,23 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
   if (msg?.type === "TAXCAP_LICENSE_STATUS" || msg?.type === "TAXCAP_GET_LICENSE") {
     (async () => {
-      const [deviceId, licState] = await Promise.all([ensureDeviceId(), loadLicenseState()]);
-      const evaluation = self.TaxCapLicense.evaluateLocalLicense(licState);
-      sendResponse({
-        ok: true,
-        deviceId,
-        license: licState,
-        state: licState,
-        evaluation,
-        defaultApiUrl: self.TAXCAP_DEFAULTS?.licenseApiUrl || "",
-      });
+      try {
+        const [deviceId, licState] = await Promise.all([ensureDeviceId(), loadLicenseState()]);
+        const evaluation = self.TaxCapLicense.evaluateLocalLicense(licState);
+        sendResponse({
+          ok: true,
+          deviceId,
+          license: licState,
+          state: licState,
+          evaluation,
+          defaultApiUrl: self.TAXCAP_DEFAULTS?.licenseApiUrl || "",
+        });
+      } catch (err) {
+        sendResponse({
+          ok: false,
+          message: err?.message || "Lỗi đọc trạng thái bản quyền.",
+        });
+      }
     })();
     return true;
   }
