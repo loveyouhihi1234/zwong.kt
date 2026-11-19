@@ -80,8 +80,8 @@
     });
   }
 
-  function configureApiUrlField(savedUrl) {
-    const presetUrl = self.TAXCAP_DEFAULTS?.licenseApiUrl || "";
+  function configureApiUrlField(savedUrl, defaultApiUrl = "") {
+    const presetUrl = defaultApiUrl || self.TAXCAP_DEFAULTS?.licenseApiUrl || "";
     const effective = savedUrl || presetUrl;
     if (presetUrl && effective === presetUrl) {
       shellUrlDirectWrap.classList.add("hidden");
@@ -103,13 +103,19 @@
     return shellApiInput.value.trim();
   }
 
-  function applyLicenseUi(licRes) {
-    const state = licRes?.state || {};
+  function applyLicenseUi(licRes, options = {}) {
+    const state = licRes?.license || licRes?.state || {};
     const evaluation = licRes?.evaluation || { unlocked: false, reason: "UNACTIVATED", message: "" };
+    const preserveInputs = Boolean(options.preserveInputs);
     isUnlocked = Boolean(evaluation.unlocked);
 
     if (shellDeviceId) {
-      shellDeviceId.textContent = licRes?.deviceId || state.deviceId || "—";
+      const nextDeviceId = licRes?.deviceId || state.deviceId || "";
+      if (nextDeviceId) {
+        shellDeviceId.textContent = nextDeviceId;
+      } else if (!shellDeviceId.textContent || shellDeviceId.textContent === "—") {
+        shellDeviceId.textContent = "—";
+      }
     }
 
     for (const btn of tabButtons) {
@@ -122,8 +128,12 @@
       shellStatus.textContent = "Chưa kích hoạt";
       shellStatus.className = "brand-meta locked";
 
-      shellKeyInput.value = state.licenseKey || "";
-      configureApiUrlField(state.licenseApiUrl || "");
+      if (!preserveInputs) {
+        if (state.licenseKey || !shellKeyInput.value.trim()) {
+          shellKeyInput.value = state.licenseKey || "";
+        }
+        configureApiUrlField(state.licenseApiUrl || "", licRes?.defaultApiUrl || "");
+      }
 
       const reasonMsg =
         evaluation.reason && evaluation.reason !== "UNACTIVATED"
@@ -150,21 +160,24 @@
     if (!hasChromeRuntime()) {
       applyLicenseUi({
         deviceId: "preview-local",
-        state: {},
+        license: {},
         evaluation: { unlocked: false, reason: "UNACTIVATED", message: "" },
       });
       return;
     }
     try {
-      const res = await chrome.runtime.sendMessage({ type: "TAXCAP_GET_LICENSE" });
+      const res = await chrome.runtime.sendMessage({ type: "TAXCAP_LICENSE_STATUS" });
+      if (!res || typeof res !== "object") {
+        throw new Error("Empty license response");
+      }
       applyLicenseUi(res);
     } catch {
       applyLicenseUi({
-        state: {},
+        license: {},
         evaluation: {
           unlocked: false,
           reason: "ERROR",
-          message: "Không thể kết nối Service Worker — hãy tải lại Extension.",
+          message: "Không thể kết nối Service Worker — hãy tải lại Extension trong chrome://extensions.",
         },
       });
     }
@@ -193,7 +206,7 @@
 
     try {
       const res = await chrome.runtime.sendMessage({
-        type: "TAXCAP_ACTIVATE_LICENSE",
+        type: "TAXCAP_LICENSE_ACTIVATE",
         licenseKey,
         licenseApiUrl,
       });
@@ -204,7 +217,7 @@
       } else {
         shellActivateStatus.textContent = res?.message || "Mã kích hoạt không hợp lệ.";
         shellActivateStatus.className = "status err";
-        applyLicenseUi(res);
+        applyLicenseUi(res, { preserveInputs: true });
       }
     } catch {
       shellActivateStatus.textContent = "Không gửi được yêu cầu kích hoạt tới Extension.";

@@ -57,7 +57,11 @@ async function getSettings() {
 async function ensureDeviceId() {
   const res = await chrome.storage.local.get(DEVICE_ID_KEY);
   if (res[DEVICE_ID_KEY]) return String(res[DEVICE_ID_KEY]);
-  const generated = `dev_${crypto.randomUUID().replace(/-/g, "").slice(0, 12)}`;
+  const rawUuid =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID().replace(/-/g, "")
+      : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  const generated = `dev_${rawUuid.slice(0, 12)}`;
   await chrome.storage.local.set({ [DEVICE_ID_KEY]: generated });
   return generated;
 }
@@ -748,7 +752,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
 
-  if (msg?.type === "TAXCAP_LICENSE_STATUS") {
+  if (msg?.type === "TAXCAP_LICENSE_STATUS" || msg?.type === "TAXCAP_GET_LICENSE") {
     (async () => {
       const [deviceId, licState] = await Promise.all([ensureDeviceId(), loadLicenseState()]);
       const evaluation = self.TaxCapLicense.evaluateLocalLicense(licState);
@@ -756,6 +760,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         ok: true,
         deviceId,
         license: licState,
+        state: licState,
         evaluation,
         defaultApiUrl: self.TAXCAP_DEFAULTS?.licenseApiUrl || "",
       });
@@ -763,7 +768,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
 
-  if (msg?.type === "TAXCAP_LICENSE_ACTIVATE") {
+  if (msg?.type === "TAXCAP_LICENSE_ACTIVATE" || msg?.type === "TAXCAP_ACTIVATE_LICENSE") {
     refreshLicenseIfNeeded({
       force: true,
       licenseKey: msg.licenseKey || "",
@@ -775,7 +780,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           ok: res.evaluation.unlocked,
           deviceId,
           license: res.state,
+          state: res.state,
           evaluation: res.evaluation,
+          defaultApiUrl: self.TAXCAP_DEFAULTS?.licenseApiUrl || "",
           message: res.evaluation.unlocked ? "Kích hoạt thành công!" : res.evaluation.message,
         });
       })

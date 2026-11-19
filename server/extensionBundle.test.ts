@@ -118,3 +118,32 @@ test('buildExtensionArtifacts still supports optional proxy mode with host_permi
   assert.equal(configJs.includes('https://taxcap-proxy.example.com'), true);
   assert.equal(configJs.includes('team-secret-123'), true);
 });
+
+test('all TAXCAP_* runtime messages sent by sidepanel, panels, and content scripts are handled by background.js', async () => {
+  const { files } = await buildExtensionArtifacts({});
+  const bg = files.find((f) => f.path === 'background.js')?.content || '';
+  const sidepanel = files.find((f) => f.path === 'sidepanel.js')?.content || '';
+
+  assert.equal(sidepanel.includes('TAXCAP_LICENSE_STATUS'), true);
+  assert.equal(sidepanel.includes('TAXCAP_LICENSE_ACTIVATE'), true);
+  assert.equal(sidepanel.includes('licRes?.license'), true);
+
+  const sentTypes = new Set<string>();
+  const typeRegex = /type\s*:\s*['"](TAXCAP_[A-Z0-9_]+)['"]/g;
+  for (const file of files) {
+    if (!file.path.endsWith('.js') || file.path === 'background.js') continue;
+    let m: RegExpExecArray | null;
+    while ((m = typeRegex.exec(file.content)) !== null) {
+      sentTypes.add(m[1]);
+    }
+  }
+
+  assert.ok(sentTypes.size >= 10, 'Expected at least 10 TAXCAP_* runtime message types');
+  for (const msgType of sentTypes) {
+    assert.equal(
+      bg.includes(`"${msgType}"`) || bg.includes(`'${msgType}'`),
+      true,
+      `background.js is missing handler for message type: ${msgType}`,
+    );
+  }
+});
