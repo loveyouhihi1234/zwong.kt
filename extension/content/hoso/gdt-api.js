@@ -166,7 +166,7 @@
 
   // Gửi form với khoảng ngày tuỳ ý (máy chủ không giới hạn 1 tháng) + captcha người dùng nhập,
   // rồi đọc hết các trang kết quả.
-  async function search({ source = 'tdt', tuNgay, denNgay, maToKhai = '', captcha, onProgress = () => {} }) {
+  async function search({ source = 'tdt', tuNgay, denNgay, maToKhai = '', captcha, onProgress = () => {}, shouldStop = () => false }) {
     const src = SOURCES[source];
     if (!src) throw new Error(`Nguồn tra cứu không hợp lệ: ${source}`);
     // Tối đa 12 tháng mỗi lần (panel cũng chặn) – ngày dạng dd/mm/yyyy
@@ -187,11 +187,16 @@
 
     const all = [];
     for (let p = 1; p <= info.pages; p++) {
-      if (p > 1) { await sleep(1000); doc = await queryPage(p); }
+      if (shouldStop()) return { rows: all, total: info.total, stopped: true };
+      if (p > 1) {
+        await sleep(1000);
+        if (shouldStop()) return { rows: all, total: info.total, stopped: true };
+        doc = await queryPage(p);
+      }
       all.push(...parseRows(doc, src).map((r) => ({ ...r, source, page: p })));
       onProgress({ page: p, pages: info.pages, count: all.length, total: info.total });
     }
-    return { rows: all, total: info.total };
+    return { rows: all, total: info.total, stopped: false };
   }
 
   // Lấy trang chi tiết bằng fetch (không chuyển trang, giữ nguyên kết quả tìm kiếm).

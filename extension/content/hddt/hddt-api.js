@@ -72,13 +72,24 @@
   const CAPTCHA_TRIES = 3;
   const CAPTCHA_ERR = /captcha|mã xác nhận|mã kiểm tra|cvalue|ckey/i;
 
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  // Chờ được ngắt bằng Dừng (kiểm tra mỗi giây); onSec(giây còn lại) để giao diện đếm ngược
+  let activeAbort = null;
+  function resetAbort() { activeAbort = new AbortController(); return activeAbort.signal; }
+  function abortActive() { try { activeAbort?.abort(new DOMException(STOPPED, 'AbortError')); } catch { /* ignore */ } }
+
+  // Chờ có thể bị ngắt ngay lập tức khi người dùng bấm Dừng (không phải đợi hết DELAY/retry sleep)
+  const sleep = (ms, signal = activeAbort?.signal) => new Promise((resolve) => {
+    if (signal?.aborted) return resolve();
+    const onAbort = () => { clearTimeout(t); resolve(); };
+    const t = setTimeout(() => { signal?.removeEventListener('abort', onAbort); resolve(); }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+  // Chờ được ngắt tức thì bằng Dừng; onSec(giây còn lại) để giao diện đếm ngược
   async function pause(ms, shouldStop = () => false, onSec) {
     for (let left = Math.ceil(ms / 1000); left > 0; left--) {
-      if (shouldStop()) throw new Error(STOPPED);
+      if (shouldStop() || activeAbort?.signal?.aborted) throw new Error(STOPPED);
       onSec?.(left);
       await sleep(1000);
+      if (shouldStop() || activeAbort?.signal?.aborted) throw new Error(STOPPED);
     }
   }
 
@@ -166,6 +177,11 @@
       let err, timedOut = false, secs = 0;
       const max = patient ? '∞' : (1 + Math.min(retries, RETRIES));
       const ctrl = new AbortController();
+      const onGlobalAbort = () => ctrl.abort(new DOMException(STOPPED, 'AbortError'));
+      if (activeAbort?.signal) {
+        if (activeAbort.signal.aborted) onGlobalAbort();
+        else activeAbort.signal.addEventListener('abort', onGlobalAbort, { once: true });
+      }
       const tick = setInterval(() => {
         secs++;
         if (shouldStop()) ctrl.abort(new DOMException(STOPPED, 'AbortError'));
@@ -177,11 +193,12 @@
         if (res.ok && !/text\/html/i.test(res.headers.get('content-type') || '')) { recovered(); return res; }
         err = res.ok ? new Error(HTML_PAGE) : await errorOf(res);
       } catch (e) {
-        if (shouldStop()) throw new Error(STOPPED);
+        if (shouldStop() || activeAbort?.signal?.aborted) throw new Error(STOPPED);
         timedOut = e.name === 'TimeoutError' || ctrl.signal.reason?.name === 'TimeoutError';
         err = new Error(timedOut ? 'Cổng thuế phản hồi quá chậm (hết thời gian chờ)' : 'Không kết nối được tới cổng thuế – hãy kiểm tra mạng');
       } finally {
         clearInterval(tick);
+        activeAbort?.signal?.removeEventListener('abort', onGlobalAbort);
         lastAt = Date.now();
       }
 
@@ -214,6 +231,7 @@
       if (!retryable(err) || i >= last || shouldStop()) throw err;
       onRetry?.({ err, attempt: i + 2, max: last + 1 });
       await sleep(Math.min(DELAY * (2 ** i), 10000));
+      if (shouldStop()) throw new Error(STOPPED);
     }
   }
 
@@ -335,6 +353,7 @@
         for (const d of j.datas || []) map.set(d.id, pick(d, kind, form, monthOf(d)));
         state = j.state;
         onPage(map.size);
+        if (shouldStop()) return { rows: [...map.values()], total, stopped: true };
         await sleep(DELAY);
       } while (state && map.size < total);
       if (map.size >= total) break;
@@ -572,5 +591,5 @@
     return Object.fromEntries(msts.filter((m) => store.msts[m]).map((m) => [m, store.msts[m]]));
   }
 
-  window.HDDT = { KINDS, FORMS, TTHAI, TTXLY, DELAY, originalLookup, getSessionInfo, splitMonths, splitDays, splitFor, search, fetchInvoice, fetchOriginal, invoiceFromXml, illegalCheck, sleep };
+  window.HDDT = { KINDS, FORMS, TTHAI, TTXLY, DELAY, originalLookup, getSessionInfo, splitMonths, splitDays, splitFor, search, fetchInvoice, fetchOriginal, invoiceFromXml, illegalCheck, sleep, resetAbort, abortActive };
 })();

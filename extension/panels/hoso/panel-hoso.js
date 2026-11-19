@@ -94,24 +94,33 @@ function presets(src = source()) {
       { key: 'y2023', label: 'Năm 2023', range: r(new Date(2023, 0, 1), new Date(2023, 11, 31)) },
     ]
     : [
+      { key: 'thisMonth', label: 'Tháng này', range: r(new Date(y, m, 1), now) },
       { key: 'lastMonth', label: 'Tháng trước', range: r(new Date(y, m - 1, 1), new Date(y, m, 0)) },
       { key: 'lastQuarter', label: 'Quý trước', range: r(new Date(y, (q - 1) * 3, 1), new Date(y, q * 3, 0)) },
-      { key: 'thisYear', label: `Năm ${y}`, range: r(new Date(y, 0, 1), now) },
-      { key: 'last12', label: '12 tháng qua', range: r(new Date(y - 1, m, now.getDate() + 1), now) },
+      { key: 'thisYear', label: 'Năm nay', range: r(new Date(y, 0, 1), now) },
     ];
   const { min, max } = limits(src), seen = new Set();
   return list.map((p) => {
     const a = p.range[0] < min ? min : p.range[0], b = p.range[1] > max ? max : p.range[1];
     return { ...p, range: [a, b] };
-  }).filter((p) => p.range[0] <= p.range[1] && !seen.has(p.range.join()) && seen.add(p.range.join()));
+  }).filter((p) => {
+    if (p.range[0] > p.range[1]) return false;
+    // Giữ đủ 4 mốc chọn nhanh cho DVC (kể cả đầu năm khi Tháng này trùng Năm nay)
+    if (src === 'dvc') return true;
+    const key = p.range.join();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 let activePreset = null;
 const markPreset = (kind) => { activePreset = kind; renderPresets(); };
 function preset(kind) {
-  const p = presets().find((x) => x.key === kind);
+  const list = presets();
+  const p = list.find((x) => x.key === kind) || list[0];
   if (!p) return;
   [$('from').value, $('to').value] = p.range;
-  markPreset(kind);
+  markPreset(p.key);
   checkRange();
   picker?.refresh(true);
 }
@@ -126,7 +135,7 @@ function renderPresets() {
   }));
 }
 // Đổi nguồn → bộ chip + giới hạn ngày mới, chọn sẵn khoảng mặc định của nguồn đó.
-const defaultPreset = () => (source() === 'dvc' ? 'last12' : 'h1');
+const defaultPreset = () => (source() === 'dvc' ? 'thisYear' : 'h1');
 $('source').addEventListener('change', () => { picker?.close(); preset(defaultPreset()); });
 // Chặn bấm liên tiếp/double click: bỏ qua cú bấm khi thao tác trước của nút chưa xong.
 function guard(btn, fn) {
@@ -212,7 +221,19 @@ async function recheck() {
   setConnected(false);
 }
 $('run').addEventListener('click', search);
-$('stop').addEventListener('click', () => { stopped = true; if (tabId) ask({ type: 'hoso-stop' }); });
+$('stop').addEventListener('click', () => {
+  if (!busy || stopped) return;
+  stopped = true;
+  $('stop').disabled = true;
+  $('stop').textContent = 'Đang dừng…';
+  $('run').textContent = 'Đang dừng…';
+  $('status').textContent = 'Đang dừng theo yêu cầu…';
+  log('Đang dừng theo yêu cầu…', 'warn');
+  if (port) {
+    try { port.postMessage({ type: 'hoso-stop' }); } catch { /* ignore */ }
+  }
+  if (tabId) ask({ type: 'hoso-stop' }).catch(() => {});
+});
 // "Tải tất cả" theo lựa chọn File cần tải; nút trong từng cột chỉ tải đúng loại của cột đó.
 const selectedKinds = () => [...document.querySelectorAll('input[name=kinds]:checked')].map((i) => i.value);
 // Bảng kết quả chỉ hiện cột tải của loại file đang chọn (CSS dựa vào data-kinds); bỏ chọn hết thì hiện cả 2 cột.
@@ -301,6 +322,8 @@ function setBusy(on) {
   busy = on;
   document.body.classList.toggle('busy', on);
   $('stop').hidden = !on;
+  $('stop').disabled = false;
+  $('stop').textContent = 'Dừng';
   syncRun();
   $('run').textContent = on ? 'Đang xử lý…' : 'Tìm kiếm';
   $('dlAll').disabled = on;
@@ -311,7 +334,8 @@ async function search() {
   if (busy) return; // đang tìm/tải: bỏ qua bấm lặp
   if (!tabId || !connected) return init();
   if (!checkRange()) { $('toText').focus(); return; }
-  $('log').innerHTML = ''; $('bar').value = 0; $('status').textContent = '';
+  $('log').innerHTML = ''; $('bar').value = 0; $('status').textContent = 'Đang bắt đầu tra cứu…';
+  stopped = false;
   pendingSearch = { source: source(), tuNgay: toVN($('from').value), denNgay: toVN($('to').value), maToKhai: $('toKhai').value, captcha: '' };
   job({ type: 'search', ...pendingSearch });
 }

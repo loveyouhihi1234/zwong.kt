@@ -1,7 +1,10 @@
 (() => {
+  if (window.__taxcapCommonLoaded) return;
+  window.__taxcapCommonLoaded = true;
   const MAX_AUTO_RETRIES = 3;
   const inputStates = new WeakMap();
   const inputWidgets = new WeakMap();
+  const EXT_ID = typeof chrome !== "undefined" && chrome.runtime?.id ? chrome.runtime.id : "taxcap-suite";
 
   function sendFeedback(st, outcome, finalLabel) {
     if (!st.lastSampleId || st.feedbackSent) return;
@@ -65,8 +68,24 @@
     let widget = inputWidgets.get(input);
     if (widget && widget.host.isConnected) return widget;
 
+    const anchor =
+      input.closest(".ant-input-affix-wrapper") ||
+      input.closest(".input-group") ||
+      input;
+
+    // Dọn dẹp widget cũ còn sót lại của chính TaxCap Suite sau khi reload extension
+    let sibling = anchor.nextElementSibling;
+    while (sibling && sibling.dataset?.taxcapWidget === "1") {
+      const next = sibling.nextElementSibling;
+      if (sibling.dataset.taxcapExtId === EXT_ID) {
+        sibling.remove();
+      }
+      sibling = next;
+    }
+
     const host = document.createElement("div");
     host.dataset.taxcapWidget = "1";
+    host.dataset.taxcapExtId = EXT_ID;
     const root = host.attachShadow({ mode: "closed" });
     root.innerHTML = `
       <style>
@@ -137,10 +156,6 @@
     });
 
     // Chèn ngay sau wrapper của AntD/Bootstrap nếu có, tránh lọt vào trong flex input-group
-    const anchor =
-      input.closest(".ant-input-affix-wrapper") ||
-      input.closest(".input-group") ||
-      input;
     anchor.insertAdjacentElement("afterend", host);
 
     widget = { host, msgEl, retryBtn, iconEl };

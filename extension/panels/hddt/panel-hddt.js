@@ -219,7 +219,19 @@ chrome.tabs.onUpdated.addListener((id, change, tab) => {
 });
 
 $('run').addEventListener('click', run);
-$('stop').addEventListener('click', () => { stopped = true; if (tabId) ask({ type: 'hddt-stop' }); });
+$('stop').addEventListener('click', () => {
+  if (!busy || stopped) return;
+  stopped = true;
+  $('stop').disabled = true;
+  $('stop').textContent = 'Đang dừng…';
+  $('run').textContent = 'Đang dừng…';
+  $('status').textContent = 'Đang dừng – vui lòng chờ lưu phần dữ liệu đã tải…';
+  log('Đang dừng theo yêu cầu…', 'warn');
+  if (port) {
+    try { port.postMessage({ type: 'hddt-stop' }); } catch { /* ignore */ }
+  }
+  if (tabId) ask({ type: 'hddt-stop' }).catch(() => {});
+});
 
 // Xử lý nút bấm tải file Excel dung lượng lớn (> 40MB) theo Phương án 1
 $('btnDownloadBigExcel')?.addEventListener('click', () => {
@@ -290,6 +302,8 @@ function setBusy(on) {
   busy = on;
   document.body.classList.toggle('busy', on);
   $('stop').hidden = !on;
+  $('stop').disabled = false;
+  $('stop').textContent = 'Dừng';
   syncRun();
   $('run').textContent = on ? 'Đang xử lý…' : 'Tìm kiếm';
 }
@@ -308,9 +322,12 @@ function run() {
   if (!forms.length) return log('Hãy chọn hình thức hóa đơn (điện tử / máy tính tiền)', 'warn');
   if (!kinds.length) return log('Hãy chọn loại hóa đơn (mua vào / bán ra)', 'warn');
   if (!Object.values(f).some(Boolean)) return log('Hãy chọn ít nhất 1 loại file cần tải', 'warn');
-  $('log').innerHTML = ''; $('bar').value = 0; $('status').textContent = '';
+  const tuNgay = toVN($('from').value), denNgay = toVN($('to').value);
+  $('log').innerHTML = ''; $('bar').value = 0;
+  $('status').textContent = 'Đang bắt đầu tra cứu…';
   stopped = false;
-  job({ type: 'run', tuNgay: toVN($('from').value), denNgay: toVN($('to').value), kinds, forms, formats: f, sheets: sheets(), adjOnly: $('adjOnly').checked });
+  log(`Bắt đầu tra cứu (${tuNgay} – ${denNgay})…`);
+  job({ type: 'run', tuNgay, denNgay, kinds, forms, formats: f, sheets: sheets(), adjOnly: $('adjOnly').checked });
 }
 
 const picker = createRangePicker({

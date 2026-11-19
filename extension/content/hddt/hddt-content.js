@@ -59,6 +59,7 @@ async function runJob({ tuNgay, denNgay, kinds, forms, filters, formats, adjOnly
   const lic = await chrome.runtime.sendMessage({ type: 'TAXCAP_CHECK_LICENSE' }).catch(() => ({ ok: false }));
   if (!lic?.ok) throw new Error(lic?.message || 'Chưa kích hoạt mã bản quyền — hãy mở TaxCap Suite để kích hoạt.');
   stopFlag = false;
+  HDDT.resetAbort?.();
   pendingBigExcel = null; // Xóa cache file cũ khi bắt đầu lượt tải mới
   const shouldStop = () => stopFlag;
   const profile = await HDDT.getSessionInfo();
@@ -225,6 +226,13 @@ async function runJob({ tuNgay, denNgay, kinds, forms, filters, formats, adjOnly
 
   // 4. Excel bảng kê (kể cả khi đã bấm Dừng: lưu với dữ liệu đã có)
   if (formats.excel) {
+    send({
+      type: 'status',
+      text: (stopFlag || res.stopped)
+        ? 'Đã dừng – đang tạo và lưu file Excel từ phần dữ liệu đã tải…'
+        : 'Đang tạo và lưu file Excel bảng kê…',
+    });
+    await new Promise((r) => setTimeout(r, 0));
     // Đặt tên file thông minh: [MST]_[BangKe / BangKeChiTiet]_[Loại HĐ]_[Từ ngày]_[Đến ngày].xlsx
     const typeName = formats.lines ? 'BangKeChiTiet' : 'BangKe';
     const prefixMst = profile.mst ? `${safeName(profile.mst)}_` : '';
@@ -281,7 +289,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
   (async () => {
     switch (msg.type) {
       case 'hddt-info': return { ...await HDDT.getSessionInfo(), busy };
-      case 'hddt-stop': stopFlag = true; return { ok: true };
+      case 'hddt-stop': stopFlag = true; HDDT.abortActive?.(); return { ok: true };
       case 'hddt-download-big-excel': return { ok: downloadPendingBigExcel() };
     }
   })().then(reply, (e) => reply({ error: e.message }));
@@ -292,6 +300,12 @@ chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== 'hddt-job') return;
   const send = (m) => { try { port.postMessage(m); } catch { /* panel đã đóng – job vẫn chạy tiếp */ } };
   port.onMessage.addListener(async (msg) => {
+    // Ngắt ngay lập tức kể cả khi job đang chạy
+    if (msg.type === 'hddt-stop' || msg.type === 'stop') {
+      stopFlag = true;
+      HDDT.abortActive?.();
+      return;
+    }
     // Lệnh yêu cầu tải file Excel dung lượng lớn từ Side Panel
     if (msg.type === 'hddt-download-big-excel' || msg.type === 'download_big_excel') {
       const ok = downloadPendingBigExcel();

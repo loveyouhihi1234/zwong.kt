@@ -147,3 +147,41 @@ test('all TAXCAP_* runtime messages sent by sidepanel, panels, and content scrip
     );
   }
 });
+
+test('v2.0.2 UI & reliability guarantees: no banners, HDDT log visible + instant abort, Hoso 4 presets, Captcha dedupe', async () => {
+  const { zipBuffer, files } = await buildExtensionArtifacts({});
+  const zip = await JSZip.loadAsync(zipBuffer);
+
+  const manifest = JSON.parse(await zip.file('manifest.json')!.async('string'));
+  assert.equal(manifest.version, '2.0.2');
+
+  const hddtHtml = await zip.file('panels/hddt/index.html')!.async('string');
+  assert.equal(hddtHtml.includes('class="notice"'), false, 'HDDT yellow update notice must be removed');
+  assert.equal(hddtHtml.includes('id="jobArea"'), true, 'HDDT Nhật ký section must exist');
+  assert.equal(hddtHtml.includes('id="log"'), true, 'HDDT log list must exist');
+
+  const hddtCss = await zip.file('panels/hddt/panel-hddt.css')!.async('string');
+  assert.equal(hddtCss.includes('.job:has(#log:empty)'), false, 'HDDT Nhật ký must not hide when empty');
+
+  const hddtApi = files.find((f) => f.path === 'content/hddt/hddt-api.js')?.content || '';
+  const hddtContent = files.find((f) => f.path === 'content/hddt/hddt-content.js')?.content || '';
+  const hddtPanelJs = files.find((f) => f.path === 'panels/hddt/panel-hddt.js')?.content || '';
+  assert.equal(hddtApi.includes('abortActive'), true, 'HDDT API must expose abortActive()');
+  assert.equal(hddtContent.includes("msg.type === 'hddt-stop'"), true, 'HDDT port must handle hddt-stop');
+  assert.equal(hddtPanelJs.includes('Đang dừng…'), true, 'HDDT Stop button must show immediate Đang dừng… feedback');
+
+  const hosoHtml = await zip.file('panels/hoso/index.html')!.async('string');
+  assert.equal(hosoHtml.includes('class="privacy"'), false, 'Hoso privacy box must be removed');
+  assert.equal(hosoHtml.includes('Cam kết không thu thập dữ liệu'), false);
+
+  const hosoPanelJs = files.find((f) => f.path === 'panels/hoso/panel-hoso.js')?.content || '';
+  for (const label of ["'Tháng này'", "'Tháng trước'", "'Quý trước'", "'Năm nay'"]) {
+    assert.equal(hosoPanelJs.includes(label), true, `Hoso presets missing ${label}`);
+  }
+  assert.equal(hosoPanelJs.includes("'12 tháng qua'"), false, 'Hoso old 12 tháng qua preset must be removed');
+
+  const commonJs = files.find((f) => f.path === 'content/common.js')?.content || '';
+  assert.equal(commonJs.includes('window.__taxcapCommonLoaded'), true, 'common.js must guard against duplicate load');
+  assert.equal(commonJs.includes('taxcapExtId'), true, 'common.js must tag and dedupe same-extension widgets');
+});
+

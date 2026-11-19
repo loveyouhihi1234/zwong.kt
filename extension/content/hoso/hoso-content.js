@@ -14,12 +14,14 @@ async function ensureLicense() {
 
 async function runSearch({ source, tuNgay, denNgay, maToKhai, captcha }, send) {
   await ensureLicense();
+  stopFlag = false;
   send({ type: 'status', text: 'Đang tra cứu…' });
-  const { rows, total } = await GDT.search({ source, tuNgay, denNgay, maToKhai, captcha,
+  const { rows, total, stopped } = await GDT.search({ source, tuNgay, denNgay, maToKhai, captcha,
+    shouldStop: () => stopFlag,
     onProgress: (p) => send({ type: 'status', text: `Đọc trang ${p.page}/${p.pages} (${p.count}/${p.total} hồ sơ)` }) });
   lastRows = rows;
   send({ type: 'rows', rows, total });
-  send({ type: 'status', text: `Tìm thấy ${rows.length} hồ sơ` });
+  send({ type: 'status', text: stopped ? `Đã dừng – tìm thấy ${rows.length} hồ sơ` : `Tìm thấy ${rows.length} hồ sơ` });
 }
 
 const KINDS = ['hoso', 'thongbao'];
@@ -107,6 +109,10 @@ chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== 'hoso-job') return;
   const send = (m) => { try { port.postMessage(m); } catch { /* panel đã đóng – job vẫn chạy tiếp */ } };
   port.onMessage.addListener(async (msg) => {
+    if (msg.type === 'hoso-stop' || msg.type === 'stop') {
+      stopFlag = true;
+      return;
+    }
     if (busy) return send({ type: 'log', level: 'warn', text: 'Đang có tác vụ chạy, hãy đợi hoặc bấm Dừng.' });
     busy = true;
     try {

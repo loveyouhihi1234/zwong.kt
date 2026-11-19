@@ -131,11 +131,12 @@ body.busy progress { display:block; }
 progress::-webkit-progress-bar { background:var(--line); border-radius:999px; }
 progress::-webkit-progress-value { background:var(--accent); border-radius:999px; transition:width .2s; }
 
-/* Nhật ký: chỉ hiện khi có nội dung */
-.job { margin-bottom:4px; padding:10px 12px 10px 10px; border:1px solid var(--line); border-radius:8px; background:#f8fafb; }
-.job:has(#log:empty) { display:none; }
+/* Nhật ký: luôn hiện để người dùng theo dõi toàn bộ quá trình tra cứu & tải */
+.job { margin-top:4px; margin-bottom:4px; padding:10px 12px 10px 10px; border:1px solid var(--line); border-radius:8px; background:#f8fafb; }
 .job-title { font-size:12px; font-weight:600; color:var(--muted); margin-bottom:6px; }
 #log { margin:0; padding-left:20px; max-height:180px; overflow:auto; font-size:12.5px; font-weight:500; }
+#log:empty { padding-left:0; list-style:none; }
+#log:empty::before { content:"Chưa có nhật ký — bấm Tìm kiếm để bắt đầu."; display:block; font-size:12px; font-weight:400; color:var(--muted); }
 #log li + li { margin-top:4px; }
 #log .ok { color:var(--ok); } #log .warn { color:var(--warn); } #log .error { color:var(--err); }
 
