@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tải hóa đơn điện tử hàng loạt</title>
+  <link rel="stylesheet" href="panel-hddt.css" />
+</head>
+
+<body>
+  <header class="topbar">
+    <img class="logo" src="../../icons/hddt-logo.svg" alt="" aria-hidden="true" />
+    <div class="titles">
+      <div class="title-row">
+        <h1 title="Tải hóa đơn điện tử hàng loạt">Tải hóa đơn điện tử hàng loạt</h1>
+        <button id="reconnect" class="icon" title="Kiểm tra lại kết nối" aria-label="Kiểm tra lại kết nối">↻</button>
+      </div>
+      <div class="sub-row">
+        <div id="company" class="company" hidden></div>
+        <div id="noCompany" class="company muted">Chưa đăng nhập hoadondientu</div>
+        <div class="session-row">
+          <span id="session" class="badge">Đang kết nối…</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Thông báo cập nhật: cổng đổi cách tra hóa đơn máy tính tiền -->
+    <div class="notice" role="status">
+      <span class="notice-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z" />
+          <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+          <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+        </svg></span>
+      <p>
+        <strong>Cập nhật mới:</strong> tính năng <b>tải hóa đơn máy tính tiền</b> đã được cập nhật theo những thay đổi
+        mới của cổng thuế.
+        Nếu gặp vấn đề khi tải, hãy <a href="https://tien-ich-ke-toan.vercel.app/" target="_blank" rel="noopener">liên
+          hệ tác giả</a>.
+      </p>
+    </div>
+
+    <!-- 1. Khoảng thời gian tra cứu -->
+    <section class="section">
+      <h2>Khoảng thời gian</h2>
+      <div id="dateRange" class="grid2 daterange">
+        <div class="field"><label for="fromText">Từ ngày</label><input id="fromText" class="date" autocomplete="off" />
+        </div>
+        <div class="field"><label for="toText">Đến ngày</label><input id="toText" class="date" autocomplete="off" />
+        </div>
+        <input id="from" type="hidden" /><input id="to" type="hidden" />
+      </div>
+      <div id="presets" class="presets" role="group" aria-label="Chọn nhanh khoảng ngày"></div>
+      <div id="rangeHint" class="hint">*Tối đa 12 tháng mỗi lần</div>
+    </section>
+
+    <!-- 2. Loại hóa đơn: Mặc định tick cả Mua vào và Bán ra -->
+    <section class="section">
+      <h2>Loại hóa đơn</h2>
+      <div class="checks" role="group" aria-label="Loại hóa đơn">
+        <label class="check"><input type="checkbox" name="kind" value="purchase" checked />Mua vào</label>
+        <label class="check"><input type="checkbox" name="kind" value="sold" checked />Bán ra</label>
+      </div>
+      <label class="toggle-box">
+        <span class="toggle-text">
+          <strong>Chỉ tải HĐ thay thế / điều chỉnh / hủy</strong>
+          <span>Bỏ qua hóa đơn bình thường, chỉ lấy các hóa đơn này.</span>
+        </span>
+        <input id="adjOnly" type="checkbox" role="switch" />
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+    </section>
+
+    <!-- 3. Hình thức: Mặc định tick cả Hóa đơn điện tử và Hóa đơn máy tính tiền -->
+    <section class="section">
+      <h2>Hình thức</h2>
+      <div class="checks" role="group" aria-label="Hình thức">
+        <label class="check"><input type="checkbox" name="form" value="hddt" checked />Hóa đơn điện tử</label>
+        <label class="check" title="Tra theo đoạn 10 ngày, mỗi đoạn tự giải 1 captcha của cổng"><input type="checkbox"
+            name="form" value="mtt" checked />Hóa đơn máy tính tiền</label>
+      </div>
+    </section>
+
+    <!-- 4. Định dạng tải về: Chỉ tick mặc định Excel, bỏ tick XML gốc -->
+    <section class="section">
+      <div class="section-head">
+        <h2>Định dạng tải về (chọn nhiều)</h2>
+        <button id="clearFmt" type="button" class="link">Bỏ chọn</button>
+      </div>
+      <div class="tiles" role="group" aria-label="Định dạng tải về">
+        <label class="tile"><input type="checkbox" name="fmt" value="excel" checked /><span>Excel (DS hóa đơn, chi
+            tiết...)</span></label>
+        <label class="tile"><input type="checkbox" name="fmt" value="xml" /><span>XML gốc</span></label>
+        <label class="tile"><input type="checkbox" name="fmt" value="html" /><span>HTML</span></label>
+        <label class="tile"
+          title="Bản thể hiện dựng trên máy từ XML của cổng, không phải PDF gốc của nhà cung cấp. Cần bản gốc: xem cột Link tra cứu HĐ gốc trong Excel"><input
+            type="checkbox" name="fmt" value="pdf" /><span>PDF (bản thể hiện)</span></label>
+      </div>
+
+      <!-- Công tắc bỏ qua chi tiết sản phẩm: tăng tốc và tối ưu RAM khi chỉ cần DS hóa đơn -->
+      <label class="toggle-box" style="margin-top:10px;">
+        <span class="toggle-text">
+          <strong>Chỉ tải danh sách (bỏ qua chi tiết sản phẩm)</strong>
+          <span>Không gọi API chi tiết từng HĐ, giúp tải siêu tốc và tiết kiệm bộ nhớ khi chỉ cần bảng kê tổng
+            hợp.</span>
+        </span>
+        <input id="skipLines" type="checkbox" role="switch" />
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+
+      <!-- 5. Sheet thêm trong file Excel: Bỏ tick mặc định Phụ lục giảm thuế GTGT -->
+      <fieldset id="sheetOpts" class="sheet-opts">
+        <legend>Sheet thêm trong Excel</legend>
+        <div class="checks">
+          <label class="check"
+            title="Hóa đơn hủy/thay thế, lệch số học, thanh toán tiền mặt từ 5 triệu, chữ ký số, ngày ký khác tháng"><input
+              type="checkbox" name="sheet" value="risk" checked />Kiểm tra rủi ro HĐ</label>
+          <label class="check"
+            title="Thêm 2 cột vào DS hóa đơn: người bán (mua vào) / người mua (bán ra) có tên trong danh sách công khai người sử dụng hóa đơn không hợp pháp của cổng không (tra gộp, lưu kết quả trên máy)"><input
+              type="checkbox" name="sheet" value="seller" checked />Kiểm tra rủi ro MST (thêm cột vào DS hóa
+            đơn)</label>
+          <label class="check" title="Đặt HĐ thay thế/điều chỉnh cạnh HĐ gốc, tô màu chỗ thay đổi"><input
+              type="checkbox" name="sheet" value="adjust" checked />So sánh HĐ thay thế với HĐ gốc</label>
+          <label class="check" title="Mẫu bảng kê tải lên HTKK (NQ 142/2024/QH15)"><input type="checkbox" name="sheet"
+              value="reduction" />Phụ lục giảm thuế GTGT</label>
+          <label id="hdkdOpt" class="check" title="Mẫu 01-2/BK-HĐKD cho hộ kinh doanh, lập từ hóa đơn mua vào"
+            hidden><input type="checkbox" name="sheet" value="hdkd" />Bảng kê HĐKD (hộ KD)</label>
+          <label id="gtgtOpt" class="check"
+            title="Tờ khai 01/GTGT điền sẵn từ hóa đơn để đối chiếu – chỉ lập khi chọn trọn 1 tháng hoặc 1 quý"><input
+              type="checkbox" name="sheet" value="gtgt" />Tờ khai 01/GTGT (tham khảo)</label>
+        </div>
+      </fieldset>
+    </section>
+
+    <!-- Nhật ký tiến trình -->
+    <section id="jobArea" class="job">
+      <div class="job-title">Nhật ký</div>
+      <ol id="log"></ol>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <dl class="summary">
+      <div>
+        <dt>Khoảng ngày:</dt>
+        <dd id="sumRange">—</dd>
+      </div>
+      <div>
+        <dt>Hóa đơn tải về:</dt>
+        <dd id="sumKinds">—</dd>
+      </div>
+      <div>
+        <dt>Định dạng tải về:</dt>
+        <dd id="sumFmt">—</dd>
+      </div>
+    </dl>
+    <progress id="bar" value="0" max="1"></progress>
+    <div class="actions">
+      <button id="run" class="primary" disabled>Tìm kiếm</button>
+      <button id="stop" hidden>Dừng</button>
+    </div>
+    <div id="status" class="status"></div>
+  </footer>
+
+  <!-- Hiện khi tải xong (không hiện khi bấm Dừng) -->
+  <dialog id="doneModal" class="modal" aria-labelledby="doneTitle">
+    <div class="modal-icon" aria-hidden="true">✓</div>
+    <h3 id="doneTitle">Đã tải xong!</h3>
+    <p id="doneText" class="modal-text"></p>
+    <p class="modal-text">Chúc bạn một ngày mới tốt lành!</p>
+
+    <!-- Nút tải file Excel dung lượng lớn (> 40MB) theo Phương án 1 -->
+    <div id="bigExcelBox" style="display:none; margin:14px 0; padding:12px 10px; border-radius:10px; background:#e6f6f4; border:1px solid #9fd8d0; text-align:center;">
+      <p style="margin:0 0 8px; font-size:12.5px; font-weight:600; color:#115e59;">
+        File Excel lớn (<span id="bigExcelSize">0</span> MB) đã sẵn sàng:
+      </p>
+      <button id="btnDownloadBigExcel" type="button" class="primary" style="width:100%; height:40px; background:#15803d; border-color:#15803d; cursor:pointer;">
+        📥 Bấm để tải File Excel
+      </button>
+    </div>
+
+    <form method="dialog"><button class="primary" style="width:100%;">Đóng</button></form>
+  </dialog>
+
+  <script type="module" src="panel-hddt.js"></script>
+</body>
+
+</html>

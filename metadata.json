@@ -1,0 +1,8 @@
+{
+  "name": "TaxCap Studio — Gemini Captcha Proxy & Extension",
+  "description": "Backend proxy Gemini Flash và bộ Chrome Extension tự điền captcha an toàn cho 4 cổng Thuế và Dịch vụ công Việt Nam.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "manifest_version": 3,
+  "name": "TaxCap Suite — Tải HĐĐT, Hồ sơ thuế & Captcha",
+  "short_name": "TaxCap Suite",
+  "version": "2.0.0",
+  "description": "Bộ công cụ kế toán hợp nhất trên Side Panel: Tải hóa đơn điện tử hàng loạt (Excel/XML/HTML/PDF), Tải hồ sơ khai thuế DVC & Thuế ĐT và Tự điền Captcha cho 4 cổng Thuế.",
+  "permissions": [
+    "storage",
+    "alarms",
+    "sidePanel",
+    "downloads"
+  ],
+  "host_permissions": [
+    "https://hoadondientu.gdt.gov.vn/*",
+    "https://thuedientu.gdt.gov.vn/*",
+    "https://dichvucong.gdt.gov.vn/*",
+    "https://tracuunnt.gdt.gov.vn/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://script.google.com/*",
+    "https://script.googleusercontent.com/*"
+  ],
+  "icons": {
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "TaxCap Suite — Tải HĐĐT, Hồ sơ thuế & Captcha",
+    "default_icon": {
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://hoadondientu.gdt.gov.vn/*"],
+      "js": [
+        "content/captcha-svg-templates.js",
+        "content/captcha-svg.js",
+        "content/common.js",
+        "content/hddt.js",
+        "content/hddt/zip.js",
+        "content/hddt/xlsx.js",
+        "content/hddt/hddt-api.js",
+        "content/hddt/report.js",
+        "content/hddt/pdf.js",
+        "content/hddt/hddt-content.js"
+      ],
+      "run_at": "document_end"
+    },
+    {
+      "matches": ["https://dichvucong.gdt.gov.vn/*"],
+      "js": [
+        "content/common.js",
+        "content/dvc.js",
+        "content/hoso/gdt-api.js",
+        "content/hoso/hoso-content.js"
+      ],
+      "run_at": "document_end"
+    },
+    {
+      "matches": ["https://thuedientu.gdt.gov.vn/*"],
+      "js": [
+        "content/common.js",
+        "content/tdt.js"
+      ],
+      "run_at": "document_end"
+    },
+    {
+      "matches": ["https://tracuunnt.gdt.gov.vn/*"],
+      "js": [
+        "content/common.js",
+        "content/tracuunnt.js"
+      ],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "matches": ["https://hoadondientu.gdt.gov.vn/*"],
+      "resources": ["content/fonts/*.ttf"]
+    }
+  ]
+}
